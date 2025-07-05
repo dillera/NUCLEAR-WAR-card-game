@@ -186,14 +186,20 @@ def main(stdscr):
         stdscr.getch()
         return
 
-    # Game Loop
+    game_loop(stdscr, game_id, player_id)
+
+def game_loop(stdscr, game_id, player_id):
+    """Main loop for handling game state updates and user input."""
     while True:
         try:
             game_state = get_game_state(game_id, player_id)
             draw_game_state(stdscr, game_state, player_id)
-        except requests.exceptions.RequestException:
-            # Handle server disconnect gracefully
-            pass
+        except requests.exceptions.RequestException as e:
+            # Display a non-blocking error message
+            h, w = stdscr.getmaxyx()
+            error_msg = f"Connection error: {e}"
+            stdscr.addstr(h - 1, 2, error_msg[:w-3]) # Truncate to fit
+            stdscr.clrtoeol()
 
         key = stdscr.getch()
         if key == ord('q'):
@@ -212,7 +218,8 @@ def main(stdscr):
                     post_command(game_id, player_id, 'play', args)
             elif command == 'attack':
                 if len(parts) == 2:
-                    args = {'attackerID': player_id, 'targetID': parts[1]}
+                    # Note: The API expects 'targetID', not 'target_id'
+                    args = {'targetID': parts[1]}
                     post_command(game_id, player_id, 'attack', args)
             elif command == 'pass':
                 post_command(game_id, player_id, 'pass', {})
