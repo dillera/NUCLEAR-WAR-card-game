@@ -25,9 +25,9 @@ def draw_menu(stdscr, title, options, selected_idx):
 
 def get_input(stdscr, prompt):
     h, w = stdscr.getmaxyx()
+    curses.echo()
     stdscr.addstr(h-2, 2, prompt)
     stdscr.clrtoeol()
-    curses.echo()
     s = stdscr.getstr(h-2, 2 + len(prompt)).decode('utf-8').strip()
     curses.noecho()
     return s

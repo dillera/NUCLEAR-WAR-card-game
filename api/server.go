@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"nuclear-war-game-server/game"
@@ -107,6 +109,19 @@ func (s *Server) getGameStateHandler(w http.ResponseWriter, r *http.Request, g *
 }
 
 func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
+	// Log the request body for debugging
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		http.Error(w, "can't read body", http.StatusBadRequest)
+		return
+	}
+	r.Body.Close() //  must close
+	// And now set a new body, which will simulate the same data we read:
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	log.Printf("Received join request with body: %s", string(bodyBytes))
+
 	g, err := s.getGameFromRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -144,6 +159,8 @@ func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("Player '%s' successfully joined game %s", req.PlayerName, g.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
