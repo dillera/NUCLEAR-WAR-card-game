@@ -4,9 +4,18 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-
 	"github.com/google/uuid"
 )
+
+// IsFull checks if the game has reached the maximum number of players.
+func (g *Game) IsFull() bool {
+	return len(g.Players) >= MaxPlayers
+}
+
+// HasStarted checks if the game has already started.
+func (g *Game) HasStarted() bool {
+	return g.State != StateWaitingForPlayers
+}
 
 // NewGame creates and initializes a new game.
 func NewGame() *Game {
@@ -41,6 +50,9 @@ func NewGame() *Game {
 
 // AddPlayer adds a new player to the game.
 func (g *Game) AddPlayer(name string) (*Player, error) {
+	if name == "" {
+		return nil, fmt.Errorf("player name cannot be empty")
+	}
 	if g.State != StateWaitingForPlayers {
 		return nil, fmt.Errorf("cannot add players, game has already started")
 	}
@@ -146,6 +158,49 @@ func (g *Game) StartGame() error {
 
 	g.State = StateOpeningRound
 	return nil
+}
+
+// NewPlayerView creates a tailored view of the game for a specific player,
+// hiding information that should not be visible to them.
+func (g *Game) NewPlayerView(playerID string) *PlayerView {
+	self, ok := g.Players[playerID]
+	if !ok {
+		return nil // Or handle error appropriately
+	}
+
+	opponents := []Opponent{}
+	for _, id := range g.PlayerOrder {
+		if id == playerID {
+			continue
+		}
+		opponentPlayer := g.Players[id]
+		opponents = append(opponents, Opponent{
+			ID:         opponentPlayer.ID,
+			Name:       opponentPlayer.Name,
+			Population: opponentPlayer.Population,
+			HandSize:   len(opponentPlayer.Hand),
+			Placemat:   &opponentPlayer.Placemat,
+			IsEliminated: opponentPlayer.IsEliminated,
+		})
+	}
+
+	var winnerName *string
+	if g.Winner != nil {
+		winnerName = &g.Winner.Name
+	}
+
+	return &PlayerView{
+		GameID:            g.ID,
+		PlayerName:        self.Name,
+		PlayerPopulation:  self.Population,
+		PlayerHand:        self.Hand,
+		PlayerPlacemat:    &self.Placemat,
+		Opponents:         opponents,
+		CurrentTurnPlayer: g.Players[g.PlayerOrder[g.CurrentPlayerIndex]].Name,
+		State:             g.State,
+		Winner:            winnerName,
+		TurnLog:           g.TurnLog,
+	}
 }
 
 // drawCard removes and returns the top card from the deck.

@@ -85,7 +85,7 @@ func (g *Game) Attack(attackerID, targetID string) error {
 		}
 		target.Placemat.ActiveCards = newTargetCards
 	} else {
-		// 4. Calculate and apply damage if not defended.
+		// 1 megaton = 1 million population
 		damage := int64(warhead.WarheadSize) * 1000000
 		target.Population -= damage
 		fmt.Printf("Attack successful! Player %s loses %d population.\n", target.Name, damage)
@@ -121,7 +121,7 @@ func (g *Game) Attack(attackerID, targetID string) error {
 	g.checkForWinner()
 
 	// 6. An attack is a turn-ending action, but only if the game isn't over.
-	if g.State != StateFinished {
+	if g.State != StateGameOver {
 		g.AdvanceTurn()
 	}
 
@@ -139,7 +139,7 @@ func (g *Game) checkForWinner() {
 
 	if len(activePlayers) == 1 {
 		g.Winner = activePlayers[0]
-		g.State = StateFinished
+		g.State = StateGameOver
 		fmt.Printf("Player %s has won the game!\n", g.Winner.Name)
 	}
 }

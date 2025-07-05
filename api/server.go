@@ -45,10 +45,6 @@ func (s *Server) getGameFromRequest(r *http.Request) (*game.Game, error) {
 }
 
 func (s *Server) createGameHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
 
 	newGame := game.NewGame()
 
@@ -97,16 +93,12 @@ func (s *Server) getGameStateHandler(w http.ResponseWriter, r *http.Request, g *
 
 	// If a playerID is provided, return a view specific to that player
 	if playerID != "" {
-		player, ok := g.Players[playerID]
-		if !ok {
+		if _, ok := g.Players[playerID]; !ok {
 			http.Error(w, "Player not found in this game", http.StatusNotFound)
 			return
 		}
-		gameView := &GameViewForPlayer{
-			Game:       g,
-			PlayerHand: player.Hand,
-		}
-		json.NewEncoder(w).Encode(gameView)
+		playerView := g.NewPlayerView(playerID)
+		json.NewEncoder(w).Encode(playerView)
 		return
 	}
 
@@ -137,6 +129,16 @@ func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if g.IsFull() {
+		http.Error(w, "Game is full", http.StatusConflict)
+		return
+	}
+
+	if g.HasStarted() {
+		http.Error(w, "Game has already started", http.StatusConflict)
+		return
+	}
+
 	player, err := g.AddPlayer(req.PlayerName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -144,7 +146,7 @@ func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(player)
 }
 
@@ -169,7 +171,8 @@ func (s *Server) startGameHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(g)
 }
 
-type attackRequest struct {
+// AttackRequest defines the expected body for an attack request.
+type AttackRequest struct {
 	AttackerID string `json:"attackerID"`
 	TargetID   string `json:"targetID"`
 }
@@ -186,7 +189,7 @@ func (s *Server) attackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req attackRequest
+	var req AttackRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -256,7 +259,7 @@ func (s *Server) playCardHandler(w http.ResponseWriter, r *http.Request) {
 // Start runs the HTTP server.
 func (s *Server) routes() {
 	s.router.HandleFunc("/games", s.createGameHandler).Methods("POST")
-	s.router.HandleFunc("/games/{gameID}", s.gameHandler)
+	s.router.HandleFunc("/games/{gameID}", s.gameHandler).Methods("GET")
 	s.router.HandleFunc("/games/{gameID}/join", s.joinGameHandler).Methods("POST")
 	s.router.HandleFunc("/games/{gameID}/start", s.startGameHandler).Methods("POST")
 	s.router.HandleFunc("/games/{gameID}/play", s.playCardHandler).Methods("POST")

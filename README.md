@@ -1,5 +1,23 @@
 # Nuclear War Game Server
 
+This project is a Go-based server for a multiplayer game of Nuclear War.
+
+## Getting Started
+
+To run the server, navigate to the project directory and run:
+
+```bash
+go run . -port=8080
+```
+
+## Testing
+
+To run the full suite of unit and integration tests, run the following command from the project root:
+
+```bash
+go test ./...
+```
+
 ## Overview
 
 This project is a Go-based server for the classic "Nuclear War" card game. It provides a RESTful API to manage game state, handle player actions, and enforce game rules. The server supports a full gameplay loop, including player elimination, a "Final Strike" retaliation mechanic for eliminated players, and victory conditions.

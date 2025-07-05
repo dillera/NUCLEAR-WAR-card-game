@@ -1,16 +1,7 @@
 package game
 
-// GameState represents the overall state of the game (e.g., Peace, War).
-const (
-	StateWaitingForPlayers  = "waiting_for_players"
-	StateOpeningRound       = "opening_round"
-	StateMainPhasePlayCards = "main_phase_play_cards"
-	StateInProgress        = "in_progress"
-	StatePeace             = "peace"
-	StateWar               = "war"
-	StateFinalStrike       = "final_strike"
-	StateFinished          = "finished"
-)
+// MaxPlayers is the maximum number of players allowed in a game.
+const MaxPlayers = 6
 
 // CardType defines the type of a card.
 const (
@@ -27,7 +18,7 @@ type Player struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
 	Population int64     `json:"population"`
-	Hand       []*Card   `json:"-"` // Hide hand from other players in JSON response
+	Hand       []*Card   `json:"hand"`
 	Placemat     Placemat `json:"placemat"`
 	IsActive     bool     `json:"is_active"`
 	IsEliminated bool     `json:"is_eliminated"`
@@ -40,6 +31,33 @@ type Placemat struct {
 	FaceDownCard2 *Card `json:"-"` // Hidden from other players
 	Deterrent1    *Card `json:"deterrent_1,omitempty"`
 	Deterrent2    *Card `json:"deterrent_2,omitempty"`
+}
+
+// PlayerView represents the game state from a single player's perspective,
+// hiding information that should not be visible to them (e.g., other players' hands).
+// This is used to provide a secure view of the game to each client.
+type PlayerView struct {
+	GameID             string        `json:"gameID"`
+	PlayerName         string        `json:"playerName"`
+	PlayerPopulation   int64         `json:"playerPopulation"`
+	PlayerHand         []*Card       `json:"playerHand"`
+	PlayerPlacemat     *Placemat     `json:"playerPlacemat"`
+	Opponents          []Opponent    `json:"opponents"`
+	CurrentTurnPlayer  string        `json:"currentTurnPlayer"`
+	State              GameState     `json:"state"`
+	Winner             *string       `json:"winner,omitempty"`
+	TurnLog            []string      `json:"turnLog"`
+}
+
+// Opponent represents a player as seen by another player.
+// It redacts sensitive information like the player's hand.
+type Opponent struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Population  int64     `json:"population"`
+	HandSize    int       `json:"handSize"`
+	Placemat    *Placemat `json:"placemat"`
+	IsEliminated bool      `json:"isEliminated"`
 }
 
 // Card represents a single card in the game.
@@ -55,6 +73,17 @@ type Card struct {
 }
 
 // Game represents the state of a single game.
+// GameState represents the different states a game can be in.
+type GameState string
+
+const (
+	StateWaitingForPlayers GameState = "waiting_for_players"
+	StateOpeningRound      GameState = "opening_round"
+	StateInProgress        GameState = "in_progress"
+	StateFinalStrike       GameState = "final_strike"
+	StateGameOver          GameState = "game_over" // Replaces "StateFinished"
+)
+
 type Game struct {
 	ID                 string             `json:"id"`
 	Players            map[string]*Player `json:"players"`
@@ -64,6 +93,7 @@ type Game struct {
 	PopulationDeck     []*Card            `json:"-"` // Population deck is not sent to clients
 	DiscardPile        []*Card            `json:"-"` // Discard pile is not sent
 	PopulationBank     int64              `json:"-"` // Population bank is not sent
-	State              string             `json:"state"`
+	State              GameState          `json:"state"`
 	Winner             *Player            `json:"winner,omitempty"`
+	TurnLog            []string           `json:"turnLog"`
 }

@@ -90,9 +90,9 @@ func (g *Game) PlayCard(playerID, cardID, location string) error {
 		if allPlayed {
 			fmt.Println("All players have played their secret cards. Resolving opening secrets.")
 			g.ResolveOpeningSecrets()
-			g.State = StateMainPhasePlayCards
+			g.State = StateInProgress
 		}
-	} else if g.State == StateMainPhasePlayCards {
+	} else if g.State == StateInProgress {
 		return nil
 	}
 
