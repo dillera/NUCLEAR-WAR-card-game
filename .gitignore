@@ -21,3 +21,6 @@ venv/
 
 # Project-specific executable
 main_executable
+
+# Python cache
+__pycache__/
