@@ -28,6 +28,7 @@ def get_input(stdscr, prompt):
     curses.echo()
     stdscr.addstr(h-2, 2, prompt)
     stdscr.clrtoeol()
+    stdscr.refresh()
     s = stdscr.getstr(h-2, 2 + len(prompt)).decode('utf-8').strip()
     curses.noecho()
     return s
