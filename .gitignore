@@ -1,4 +1,9 @@
+# Go
+nuclear-war-game-server
+
 # Python virtual environment
+client/venv/
+
 venv/
 
 # Binaries for programs and plugins
