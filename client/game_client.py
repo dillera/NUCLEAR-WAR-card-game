@@ -140,12 +140,18 @@ def main(stdscr):
         if current_option == 0: # Create Game
             game_info = create_game()
             game_id = game_info['id']
-            player_name = get_input(stdscr, "Enter your name: ")
+            player_name = ""
+            while not player_name:
+                player_name = get_input(stdscr, "Enter your name: ")
             player_info = join_game(game_id, player_name)
             player_id = player_info['id']
         else: # Join Game
-            game_id = get_input(stdscr, "Enter Game ID: ")
-            player_name = get_input(stdscr, "Enter your name: ")
+            game_id = ""
+            while not game_id:
+                game_id = get_input(stdscr, "Enter Game ID: ")
+            player_name = ""
+            while not player_name:
+                player_name = get_input(stdscr, "Enter your name: ")
             player_info = join_game(game_id, player_name)
             player_id = player_info['id']
     except requests.exceptions.RequestException as e:
