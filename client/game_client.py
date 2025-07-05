@@ -25,12 +25,21 @@ def draw_menu(stdscr, title, options, selected_idx):
 
 def get_input(stdscr, prompt):
     h, w = stdscr.getmaxyx()
-    curses.echo()
+    # Set terminal state for text input
+    curses.curs_set(1)  # Make cursor visible
+    stdscr.nodelay(0)   # Use blocking input
+    curses.echo()       # Echo characters to the screen
+
     stdscr.addstr(h-2, 2, prompt)
     stdscr.clrtoeol()
     stdscr.refresh()
+
     s = stdscr.getstr(h-2, 2 + len(prompt)).decode('utf-8').strip()
+
+    # Restore terminal state for game loop
     curses.noecho()
+    stdscr.nodelay(1)
+    curses.curs_set(0)
     return s
 
 def draw_card(win, y, x, card):
