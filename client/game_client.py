@@ -150,6 +150,21 @@ def main(stdscr):
         if current_option == 0: # Create Game
             game_info = create_game()
             game_id = game_info['id']
+
+            # Display the Game ID so it can be shared
+            stdscr.clear()
+            h, w = stdscr.getmaxyx()
+            msg1 = f"Game Created! Your Game ID is: {game_id}"
+            msg2 = "Share this ID with other players so they can join."
+            msg3 = "Press any key to continue..."
+            stdscr.addstr(h//2 - 2, w//2 - len(msg1)//2, msg1)
+            stdscr.addstr(h//2, w//2 - len(msg2)//2, msg2)
+            stdscr.addstr(h//2 + 2, w//2 - len(msg3)//2, msg3)
+            stdscr.refresh()
+            stdscr.nodelay(0)  # Wait for user to press a key
+            stdscr.getch()
+            stdscr.nodelay(1)  # Restore non-blocking mode
+
             player_name = ""
             while not player_name:
                 player_name = get_input(stdscr, "Enter your name: ")
