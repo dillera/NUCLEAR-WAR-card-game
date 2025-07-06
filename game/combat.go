@@ -6,6 +6,9 @@ import (
 
 // Attack handles a player's action to attack another player.
 func (g *Game) Attack(attackerID, targetID string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	// 1. Find attacker and target players.
 	attacker, ok := g.Players[attackerID]
 	if !ok {
@@ -129,6 +132,7 @@ func (g *Game) Attack(attackerID, targetID string) error {
 }
 
 // checkForWinner checks if there is only one player left and declares them the winner.
+// This is an internal function and assumes a lock is already held.
 func (g *Game) checkForWinner() {
 	activePlayers := []*Player{}
 	for _, player := range g.Players {

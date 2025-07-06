@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -9,11 +10,15 @@ import (
 
 // IsFull checks if the game has reached the maximum number of players.
 func (g *Game) IsFull() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return len(g.Players) >= MaxPlayers
 }
 
 // HasStarted checks if the game has already started.
 func (g *Game) HasStarted() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return g.State != StateWaitingForPlayers
 }
 
@@ -50,6 +55,8 @@ func NewGame() *Game {
 
 // AddPlayer adds a new player to the game.
 func (g *Game) AddPlayer(name string) (*Player, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if name == "" {
 		return nil, fmt.Errorf("player name cannot be empty")
 	}
@@ -78,6 +85,8 @@ func (g *Game) AddPlayer(name string) (*Player, error) {
 
 // StartGame begins the game, dealing cards to players.
 func (g *Game) StartGame() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if g.State != StateWaitingForPlayers {
 		return fmt.Errorf("game has already started")
 	}
@@ -160,9 +169,41 @@ func (g *Game) StartGame() error {
 	return nil
 }
 
+// getAvailableCommands determines the commands available to a player based on the game state.
+// NOTE: This function assumes a read lock is already held on the game state.
+func (g *Game) getAvailableCommands(playerID string) []Command {
+	commands := []Command{}
+	player, ok := g.Players[playerID]
+	if !ok || player.IsEliminated {
+		return commands // No commands for eliminated or non-existent players
+	}
+
+	switch g.State {
+	case StateWaitingForPlayers:
+		// Any player can start the game if there are enough players.
+		if len(g.Players) >= 2 {
+			commands = append(commands, Command{Name: "start", Description: "Start the game (2+ players required)"})
+		}
+	case StateOpeningRound, StateInProgress:
+		// Check if it's the current player's turn
+		if len(g.PlayerOrder) > g.CurrentPlayerIndex && g.PlayerOrder[g.CurrentPlayerIndex] == playerID {
+			commands = append(commands, Command{Name: "play", Description: "Play a card (e.g., play <cardID> <location>)"})
+			commands = append(commands, Command{Name: "pass", Description: "Pass your turn"})
+			// A simple check if an attack is possible.
+			if g.State == StateInProgress {
+				// A more complex check for valid targets/cards would go here
+				commands = append(commands, Command{Name: "attack", Description: "Attack a player (e.g., attack <target_player_id>)"})
+			}
+		}
+	}
+	return commands
+}
+
 // NewPlayerView creates a tailored view of the game for a specific player,
 // hiding information that should not be visible to them.
 func (g *Game) NewPlayerView(playerID string) *PlayerView {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	self, ok := g.Players[playerID]
 	if !ok {
 		return nil // Or handle error appropriately
@@ -184,26 +225,38 @@ func (g *Game) NewPlayerView(playerID string) *PlayerView {
 		})
 	}
 
+	var currentTurnPlayerName string
+	var currentTurnPlayerId string
+	if len(g.PlayerOrder) > 0 && g.CurrentPlayerIndex < len(g.PlayerOrder) {
+		currentTurnPlayerId = g.PlayerOrder[g.CurrentPlayerIndex]
+		if p, ok := g.Players[currentTurnPlayerId]; ok {
+			currentTurnPlayerName = p.Name
+		}
+	}
+
 	var winnerName *string
 	if g.Winner != nil {
 		winnerName = &g.Winner.Name
 	}
 
 	return &PlayerView{
-		GameID:            g.ID,
-		PlayerName:        self.Name,
-		PlayerPopulation:  self.Population,
-		PlayerHand:        self.Hand,
-		PlayerPlacemat:    &self.Placemat,
-		Opponents:         opponents,
-		CurrentTurnPlayer: g.Players[g.PlayerOrder[g.CurrentPlayerIndex]].Name,
-		State:             g.State,
-		Winner:            winnerName,
-		TurnLog:           g.TurnLog,
+		GameID:              g.ID,
+		PlayerName:          self.Name,
+		PlayerPopulation:    self.Population,
+		PlayerHand:          self.Hand,
+		PlayerPlacemat:      &self.Placemat,
+		Opponents:           opponents,
+		CurrentTurnPlayer:   currentTurnPlayerName,
+		CurrentTurnPlayerId: currentTurnPlayerId,
+		State:               g.State,
+		Winner:              winnerName,
+		TurnLog:             g.TurnLog,
+		AvailableCommands:   g.getAvailableCommands(playerID),
 	}
 }
 
 // drawCard removes and returns the top card from the deck.
+// This is an internal function and assumes a lock is already held.
 func (g *Game) drawCard() *Card {
 	if len(g.Deck) == 0 {
 		// Reshuffle discard pile into deck if needed
@@ -215,4 +268,15 @@ func (g *Game) drawCard() *Card {
 	card := g.Deck[0]
 	g.Deck = g.Deck[1:]
 	return card
+}
+
+// ToJSON returns a JSON string representation of the game state, handling locking.
+func (g *Game) ToJSON() (string, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	bytes, err := json.MarshalIndent(g, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }

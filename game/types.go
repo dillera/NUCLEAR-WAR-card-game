@@ -1,5 +1,9 @@
 package game
 
+import (
+	"sync"
+)
+
 // MaxPlayers is the maximum number of players allowed in a game.
 const MaxPlayers = 6
 
@@ -46,7 +50,9 @@ type PlayerView struct {
 	CurrentTurnPlayer  string        `json:"currentTurnPlayer"`
 	State              GameState     `json:"state"`
 	Winner             *string       `json:"winner,omitempty"`
-	TurnLog            []string      `json:"turnLog"`
+	TurnLog             []string      `json:"turnLog"`
+	CurrentTurnPlayerId string        `json:"currentTurnPlayerId,omitempty"`
+	AvailableCommands   []Command     `json:"availableCommands,omitempty"`
 }
 
 // Opponent represents a player as seen by another player.
@@ -58,6 +64,15 @@ type Opponent struct {
 	HandSize    int       `json:"handSize"`
 	Placemat    *Placemat `json:"placemat"`
 	IsEliminated bool      `json:"isEliminated"`
+}
+
+// Command represents a single action a player can take.
+// This is used to dynamically inform the client about available options.
+type Command struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// We can add fields for required parameters here later if needed
+	// e.g., Params []string `json:"params"`
 }
 
 // Card represents a single card in the game.
@@ -96,4 +111,5 @@ type Game struct {
 	State              GameState          `json:"state"`
 	Winner             *Player            `json:"winner,omitempty"`
 	TurnLog            []string           `json:"turnLog"`
+	mu                 sync.RWMutex       `json:"-"` // Mutex to protect game state
 }

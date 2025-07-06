@@ -100,6 +100,7 @@ func (s *Server) getGameStateHandler(w http.ResponseWriter, r *http.Request, g *
 			return
 		}
 		playerView := g.NewPlayerView(playerID)
+
 		json.NewEncoder(w).Encode(playerView)
 		return
 	}
@@ -120,7 +121,10 @@ func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	// And now set a new body, which will simulate the same data we read:
 	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-	log.Printf("Received join request with body: %s", string(bodyBytes))
+	var joinReq JoinGameRequest
+	if err := json.Unmarshal(bodyBytes, &joinReq); err == nil {
+		log.Printf("Received join request from player '%s'", joinReq.PlayerName)
+	}
 
 	g, err := s.getGameFromRequest(r)
 	if err != nil {
@@ -162,28 +166,40 @@ func (s *Server) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Player '%s' successfully joined game %s", req.PlayerName, g.ID)
 
+	log.Printf("Game %s: Player '%s' joined (total players: %d)", g.ID, req.PlayerName, len(g.Players))
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(player)
 }
 
 func (s *Server) startGameHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("START GAME: Handler called for URL: %s", r.URL.Path)
+	
 	g, err := s.getGameFromRequest(r)
 	if err != nil {
+		log.Printf("START GAME ERROR: Failed to get game: %v", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	log.Printf("START GAME: Found game %s with %d players in state: %s", g.ID, len(g.Players), g.State)
+	
 	if r.Method != http.MethodPost {
+		log.Printf("START GAME ERROR: Invalid method: %s", r.Method)
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
+	log.Printf("START GAME: Calling g.StartGame() for game %s", g.ID)
 	if err := g.StartGame(); err != nil {
+		log.Printf("START GAME ERROR: Failed to start game: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("START GAME: Game %s successfully started! New state: %s", g.ID, g.State)
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(g)
 }

@@ -4,6 +4,9 @@ import "fmt"
 
 // PlayCard handles a player's action to play a card.
 func (g *Game) PlayCard(playerID, cardID, location string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	// 1. Find the player
 	player, ok := g.Players[playerID]
 	if !ok {
@@ -101,7 +104,8 @@ func (g *Game) PlayCard(playerID, cardID, location string) error {
 
 // PassTurn allows the current player to pass their turn.
 func (g *Game) PassTurn(playerID string) error {
-	// Concurrency is handled at the server level.
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
 	// Check if it's the player's turn.
 	if g.PlayerOrder[g.CurrentPlayerIndex] != playerID {
@@ -113,6 +117,7 @@ func (g *Game) PassTurn(playerID string) error {
 }
 
 // AdvanceTurn moves to the next active player, skipping those who are eliminated.
+// This is an internal function and assumes a lock is already held.
 func (g *Game) AdvanceTurn() {
 	// Loop through players to find the next non-eliminated one.
 	for i := 0; i < len(g.PlayerOrder); i++ {
@@ -128,6 +133,7 @@ func (g *Game) AdvanceTurn() {
 }
 
 // ResolveOpeningSecrets handles the simultaneous reveal of secret cards.
+// This is an internal function and assumes a lock is already held.
 func (g *Game) ResolveOpeningSecrets() {
 	fmt.Println("--- Resolving Opening Secrets ---")
 	for _, playerID := range g.PlayerOrder {

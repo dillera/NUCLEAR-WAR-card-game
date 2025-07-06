@@ -50,51 +50,115 @@ def draw_card(win, y, x, card):
     card_win.addstr(1, 2, f"[{card_type}]", curses.A_BOLD)
     
     name = card.get('name', 'N/A')
-    wrapped_name = textwrap.wrap(name, card_width - 4)
-    for i, line in enumerate(wrapped_name):
-        if i < 2: # Max 2 lines for name
-            card_win.addstr(2 + i, 2, line)
+    card_win.addstr(2, 2, card.get('name', 'Unnamed Card')[:card_width-4])
 
-    if card_type == 'Warhead':
-        yield_val = card.get('yield', 0)
-        card_win.addstr(5, 2, f"Yield: {yield_val} MT")
-    elif card_type == 'Delivery System':
-        pass # No extra info needed
-    elif card_type == 'Secret':
-        card_win.addstr(4, 2, "(Secret)")
-
+    # Display Card ID
+    card_id = card.get('id', '')
+    if card_id:
+        card_win.addstr(3, 2, f"ID: {card_id[:10]}", curses.A_DIM) # Show first 10 chars of ID
+    
+    # Add description or other details
+    desc = card.get('description', '')
+    if card.get('type') == 'Warhead':
+        desc = f"Yield: {card.get('value', 0)} MT"
+    
+    if desc:
+        card_win.addstr(5, 2, desc[:card_width-4])
     win.refresh()
 
 def draw_game_state(stdscr, game_state, player_id):
     stdscr.clear()
     h, w = stdscr.getmaxyx()
-    
-    # Game Info
-    stdscr.addstr(1, 2, f"Game ID: {game_state.get('id', 'N/A')} | Your Player ID: {player_id}")
+
+    # --- Section 1: Game and Player Info ---
+    stdscr.addstr(1, 2, f"Game ID: {game_state.get('gameID', 'N/A')} | Your Player ID: {player_id[:8]}...", curses.A_BOLD)
     stdscr.addstr(2, 2, f"Game State: {game_state.get('state', 'N/A')}")
-    
-    # Players
-    players = game_state.get('players', {})
+
+    # --- Section 2: Player List ---
     stdscr.addstr(4, 2, "Players:", curses.A_BOLD)
-    for i, p in enumerate(players.values()):
-        elim_status = " (Eliminated)" if p.get('is_eliminated') else ""
-        pop_str = f"{p.get('population', 0):,}"
-        player_line = f"- {p.get('name', 'N/A')} (Pop: {pop_str}){elim_status}"
-        if p.get('id') == game_state.get('current_turn_player_id'):
-            player_line += " <-- CURRENT TURN"
-        stdscr.addstr(5 + i, 4, player_line)
+    player_y = 5
+    all_players = []
+    if game_state.get('playerName'):
+        all_players.append({
+            'id': player_id,
+            'name': f"{game_state.get('playerName')} (You)",
+            'population': game_state.get('playerPopulation'),
+            'isEliminated': game_state.get('isEliminated', False)
+        })
+    all_players.extend(game_state.get('opponents', []))
 
-    # Player Hand
-    hand = game_state.get('player_hand', [])
-    stdscr.addstr(h - 12, 2, "Your Hand:", curses.A_BOLD)
+    for p in all_players:
+        pop = p.get('population', 0)
+        elim_status = "(ELIMINATED)" if p.get('isEliminated') else f"(Pop: {pop:,})"
+        player_info = f"- {p.get('name', 'Unknown')} {elim_status}"
+
+        attr = curses.A_NORMAL
+        if p.get('id') == game_state.get('currentTurnPlayerId'):
+            attr = curses.A_BOLD
+        if p.get('isEliminated'):
+            attr |= curses.A_DIM
+
+        stdscr.addstr(player_y, 4, player_info[:w-5], attr)
+        player_y += 1
+
+    # --- Section 3: Turn Indicator / Game Ready Message ---
+    y_offset = player_y + 2 # Dynamic positioning with extra space
+    if game_state.get('state') == 'waiting_for_players' and len(all_players) >= 2:
+        start_msg = "*** GAME READY TO START! Type 'start' to begin ***"
+        stdscr.attron(curses.A_BOLD | curses.color_pair(1))
+        stdscr.addstr(y_offset, max(2, (w - len(start_msg)) // 2), start_msg)
+        stdscr.attroff(curses.A_BOLD | curses.color_pair(1))
+    elif game_state.get('state') not in ['waiting_for_players', 'game_over']:
+        current_turn_player_id = game_state.get('currentTurnPlayerId')
+        if current_turn_player_id == player_id:
+            turn_msg = "It's YOUR turn!"
+            stdscr.attron(curses.A_BOLD | curses.color_pair(1))
+            stdscr.addstr(y_offset, max(2, (w - len(turn_msg)) // 2), turn_msg)
+            stdscr.attroff(curses.A_BOLD | curses.color_pair(1))
+        else:
+            current_player_name = game_state.get('currentTurnPlayer', 'Unknown')
+            wait_msg = f"Waiting for {current_player_name} to play..."
+            stdscr.addstr(y_offset, max(2, (w - len(wait_msg)) // 2), wait_msg)
+
+    # --- Section 4: Player's Hand ---
+    hand_y = h - 10
+    stdscr.addstr(hand_y - 2, 2, "Your Hand:", curses.A_BOLD)
+    hand = game_state.get('playerHand', [])
     if not hand:
-        stdscr.addstr(h - 10, 4, "(No cards in hand)")
+        stdscr.addstr(hand_y, 4, "(No cards in hand)")
     else:
-        for i, card in enumerate(hand):
-            draw_card(stdscr, h - 10, 2 + (i * 24), card)
+        card_display_width = 24
+        max_cards = (w - 4) // card_display_width
+        cards_to_draw = hand[:max_cards]
+        for i, card in enumerate(cards_to_draw):
+            draw_card(stdscr, hand_y, 2 + (i * card_display_width), card)
+        if len(hand) > max_cards:
+            more_cards_x = 2 + (max_cards * card_display_width)
+            if more_cards_x < w - 15:
+                stdscr.addstr(hand_y + 8, more_cards_x, f"(+ {len(hand) - max_cards} more)")
 
-    stdscr.addstr(h - 3, 2, "'q' to quit | Enter command:")
+    # --- Section 5: Available Commands ---
+    cmd_y_start = h - 7
+    stdscr.addstr(cmd_y_start - 2, 2, "Available Commands:", curses.A_BOLD)
+    commands = game_state.get('availableCommands', [])
+    if commands:
+        cmd_idx = 0
+        for cmd_data in commands:
+            cmd_str = f"{cmd_idx+1}. {cmd_data['name']} - {cmd_data['description']}"
+            stdscr.addstr(cmd_y_start -1 + cmd_idx, 4, cmd_str[:w-6])
+            cmd_idx += 1
+        
+        if any(cmd['name'] == 'play' for cmd in commands):
+            hint = "Play locations: active, deterrent_1, deterrent_2"
+            stdscr.addstr(cmd_y_start -1 + cmd_idx + 1, 4, hint, curses.A_DIM)
+    else:
+        stdscr.addstr(cmd_y_start -1, 4, "(No commands available right now)")
+
+    # --- Section 6: Final Prompt ---
+    stdscr.addstr(h - 1, 2, "Press 'q' to quit | Press Enter to input a command")
     stdscr.refresh()
+
+
 
 # --- API Functions ---
 
@@ -205,7 +269,22 @@ def game_loop(stdscr, game_id, player_id):
         if key == ord('q'):
             break
         elif key == curses.KEY_ENTER or key in [10, 13]:
+            # Get latest command list from server
+            game_state = get_game_state(game_id, player_id)
+            commands = game_state.get('availableCommands', [])
+
+            # Show command prompt
             cmd_line = get_input(stdscr, "> ")
+
+            # Check if input is a number (shortcut)
+            if cmd_line.isdigit():
+                cmd_num = int(cmd_line)
+                if 1 <= cmd_num <= len(commands):
+                    # Convert number to command name from server's list
+                    command = commands[cmd_num-1]['name']
+                    # Reconstruct cmd_line to handle commands with args later
+                    cmd_line = command
+            
             parts = cmd_line.split()
             if not parts:
                 continue
